@@ -3,48 +3,215 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>🧮 Fancy Calculator</title>
+    <title>🧮 Advanced Calculator Suite</title>
     <link rel="stylesheet" href="style.css">
+    <script src="https://unpkg.com/mathjs@11.11.0/lib/browser/math.min.js"></script>
 </head>
 <body>
-    <div class="calculator-container">
-        <div class="calculator">
-            <div class="theme-toggle">
-                <button id="themeToggle" class="theme-btn">
-                    <span class="theme-icon">🌙</span>
-                </button>
+    <div class="app-container">
+        <!-- Header with theme and mode controls -->
+        <header class="app-header">
+            <h1>🧮 Calculator Suite</h1>
+            <div class="controls">
+                <div class="theme-selector">
+                    <select id="themeSelector">
+                        <option value="light">Modern Light</option>
+                        <option value="dark">Dark Mode</option>
+                        <option value="retro">Retro Casio</option>
+                        <option value="cyberpunk">Cyberpunk</option>
+                    </select>
+                </div>
+                <button id="modeToggle" class="mode-btn">Scientific</button>
             </div>
-            
-            <div class="display">
-                <div class="operation-display" id="operationDisplay"></div>
-                <div class="display-text" id="display">0</div>
+        </header>
+
+        <!-- Tab Navigation -->
+        <nav class="tab-nav">
+            <button class="tab-btn active" data-tab="calculator">➕ Calculator</button>
+            <button class="tab-btn" data-tab="unit">📏 Unit Converter</button>
+            <button class="tab-btn" data-tab="currency">💰 Currency</button>
+            <button class="tab-btn" data-tab="age">🎂 Age Calculator</button>
+        </nav>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Calculator Tab -->
+            <div id="calculator" class="tab-content active">
+                <div class="calculator-layout">
+                    <!-- Calculator Section -->
+                    <div class="calculator-section">
+                        <div class="display-container">
+                            <div class="expression-input">
+                                <input type="text" id="expressionInput" placeholder="Enter expression..." autocomplete="off">
+                                <button id="copyResult" class="copy-btn" title="Copy result">📋</button>
+                            </div>
+                            <div class="result-display" id="resultDisplay">0</div>
+                            <div class="step-display" id="stepDisplay"></div>
+                        </div>
+                        
+                        <div class="calculator-controls">
+                            <label class="toggle-switch">
+                                <input type="checkbox" id="stepMode">
+                                <span class="slider">Show Steps</span>
+                            </label>
+                        </div>
+
+                        <!-- Basic Calculator Buttons -->
+                        <div class="buttons basic-mode" id="basicButtons">
+                            <button class="btn btn-clear" data-action="clear">AC</button>
+                            <button class="btn btn-clear" data-action="delete">⌫</button>
+                            <button class="btn btn-operator" data-value="/">÷</button>
+                            <button class="btn btn-operator" data-value="*">×</button>
+                            
+                            <button class="btn btn-number" data-value="7">7</button>
+                            <button class="btn btn-number" data-value="8">8</button>
+                            <button class="btn btn-number" data-value="9">9</button>
+                            <button class="btn btn-operator" data-value="-">−</button>
+                            
+                            <button class="btn btn-number" data-value="4">4</button>
+                            <button class="btn btn-number" data-value="5">5</button>
+                            <button class="btn btn-number" data-value="6">6</button>
+                            <button class="btn btn-operator" data-value="+">+</button>
+                            
+                            <button class="btn btn-number" data-value="1">1</button>
+                            <button class="btn btn-number" data-value="2">2</button>
+                            <button class="btn btn-number" data-value="3">3</button>
+                            <button class="btn btn-equals" data-action="equals" rowspan="2">=</button>
+                            
+                            <button class="btn btn-number btn-zero" data-value="0">0</button>
+                            <button class="btn btn-number" data-value=".">.</button>
+                            <button class="btn btn-operator" data-value="(">(</button>
+                            <button class="btn btn-operator" data-value=")">)</button>
+                        </div>
+
+                        <!-- Scientific Calculator Buttons -->
+                        <div class="buttons scientific-mode hidden" id="scientificButtons">
+                            <button class="btn btn-clear" data-action="clear">AC</button>
+                            <button class="btn btn-clear" data-action="delete">⌫</button>
+                            <button class="btn btn-memory" data-action="mc">MC</button>
+                            <button class="btn btn-memory" data-action="mr">MR</button>
+                            <button class="btn btn-memory" data-action="mplus">M+</button>
+                            
+                            <button class="btn btn-function" data-value="sin(">sin</button>
+                            <button class="btn btn-function" data-value="cos(">cos</button>
+                            <button class="btn btn-function" data-value="tan(">tan</button>
+                            <button class="btn btn-function" data-value="log(">log</button>
+                            <button class="btn btn-function" data-value="ln(">ln</button>
+                            
+                            <button class="btn btn-number" data-value="7">7</button>
+                            <button class="btn btn-number" data-value="8">8</button>
+                            <button class="btn btn-number" data-value="9">9</button>
+                            <button class="btn btn-operator" data-value="/">÷</button>
+                            <button class="btn btn-function" data-value="sqrt(">√</button>
+                            
+                            <button class="btn btn-number" data-value="4">4</button>
+                            <button class="btn btn-number" data-value="5">5</button>
+                            <button class="btn btn-number" data-value="6">6</button>
+                            <button class="btn btn-operator" data-value="*">×</button>
+                            <button class="btn btn-function" data-value="^2">x²</button>
+                            
+                            <button class="btn btn-number" data-value="1">1</button>
+                            <button class="btn btn-number" data-value="2">2</button>
+                            <button class="btn btn-number" data-value="3">3</button>
+                            <button class="btn btn-operator" data-value="-">−</button>
+                            <button class="btn btn-function" data-value="^">x^y</button>
+                            
+                            <button class="btn btn-number btn-zero" data-value="0">0</button>
+                            <button class="btn btn-number" data-value=".">.</button>
+                            <button class="btn btn-constant" data-value="pi">π</button>
+                            <button class="btn btn-operator" data-value="+">+</button>
+                            <button class="btn btn-constant" data-value="e">e</button>
+                            
+                            <button class="btn btn-operator" data-value="(">(</button>
+                            <button class="btn btn-operator" data-value=")">)</button>
+                            <button class="btn btn-equals" data-action="equals" colspan="3">=</button>
+                        </div>
+                    </div>
+
+                    <!-- History Section -->
+                    <div class="history-section">
+                        <div class="history-header">
+                            <h3>📚 History</h3>
+                            <button id="clearHistory" class="clear-btn">Clear All</button>
+                        </div>
+                        <div class="history-list" id="historyList">
+                            <div class="history-empty">No calculations yet</div>
+                        </div>
+                    </div>
+                </div>
             </div>
-            
-            <div class="buttons">
-                <button class="btn btn-clear" data-action="clear">AC</button>
-                <button class="btn btn-clear" data-action="delete">⌫</button>
-                <button class="btn btn-operator" data-action="divide">÷</button>
-                <button class="btn btn-operator" data-action="multiply">×</button>
-                
-                <button class="btn btn-number" data-number="7">7</button>
-                <button class="btn btn-number" data-number="8">8</button>
-                <button class="btn btn-number" data-number="9">9</button>
-                <button class="btn btn-operator" data-action="subtract">−</button>
-                
-                <button class="btn btn-number" data-number="4">4</button>
-                <button class="btn btn-number" data-number="5">5</button>
-                <button class="btn btn-number" data-number="6">6</button>
-                <button class="btn btn-operator" data-action="add">+</button>
-                
-                <button class="btn btn-number" data-number="1">1</button>
-                <button class="btn btn-number" data-number="2">2</button>
-                <button class="btn btn-number" data-number="3">3</button>
-                <button class="btn btn-equals" data-action="equals" rowspan="2">=</button>
-                
-                <button class="btn btn-number btn-zero" data-number="0">0</button>
-                <button class="btn btn-number" data-action="decimal">.</button>
+
+            <!-- Unit Converter Tab -->
+            <div id="unit" class="tab-content">
+                <div class="converter-container">
+                    <h2>📏 Unit Converter</h2>
+                    <div class="converter-section">
+                        <select id="unitCategory">
+                            <option value="length">Length</option>
+                            <option value="weight">Weight</option>
+                            <option value="temperature">Temperature</option>
+                        </select>
+                        <div class="conversion-row">
+                            <div class="input-group">
+                                <input type="number" id="fromValue" placeholder="Enter value">
+                                <select id="fromUnit"></select>
+                            </div>
+                            <div class="convert-arrow">→</div>
+                            <div class="input-group">
+                                <input type="number" id="toValue" readonly>
+                                <select id="toUnit"></select>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
-        </div>
+
+            <!-- Currency Converter Tab -->
+            <div id="currency" class="tab-content">
+                <div class="converter-container">
+                    <h2>💰 Currency Converter</h2>
+                    <div class="converter-section">
+                        <div class="conversion-row">
+                            <div class="input-group">
+                                <input type="number" id="currencyFromValue" placeholder="Enter amount">
+                                <select id="currencyFrom">
+                                    <option value="VND">VND - Vietnamese Dong</option>
+                                    <option value="USD">USD - US Dollar</option>
+                                    <option value="EUR">EUR - Euro</option>
+                                </select>
+                            </div>
+                            <div class="convert-arrow">→</div>
+                            <div class="input-group">
+                                <input type="number" id="currencyToValue" readonly>
+                                <select id="currencyTo">
+                                    <option value="USD">USD - US Dollar</option>
+                                    <option value="VND">VND - Vietnamese Dong</option>
+                                    <option value="EUR">EUR - Euro</option>
+                                </select>
+                            </div>
+                        </div>
+                        <div class="exchange-rates">
+                            <small>Exchange rates (mock data): 1 USD = 24,000 VND = 0.85 EUR</small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Age Calculator Tab -->
+            <div id="age" class="tab-content">
+                <div class="converter-container">
+                    <h2>🎂 Age Calculator</h2>
+                    <div class="age-section">
+                        <div class="input-group">
+                            <label for="birthDate">Date of Birth:</label>
+                            <input type="date" id="birthDate">
+                        </div>
+                        <button id="calculateAge" class="btn btn-primary">Calculate Age</button>
+                        <div class="age-result" id="ageResult"></div>
+                    </div>
+                </div>
+            </div>
+        </main>
     </div>
     
     <script src="script.js"></script>

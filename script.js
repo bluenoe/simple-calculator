@@ -1,98 +1,99 @@
-class Calculator {
+// Advanced Calculator Suite - Main JavaScript File
+
+class AdvancedCalculator {
     constructor() {
-        this.display = document.getElementById('display');
-        this.operationDisplay = document.getElementById('operationDisplay');
-        this.themeToggle = document.getElementById('themeToggle');
-        this.currentInput = '0';
-        this.previousInput = '';
-        this.operator = null;
-        this.waitingForOperand = false;
-        this.isDarkTheme = false;
-        this.activeOperatorButton = null;
+        // Core elements
+        this.expressionInput = document.getElementById('expressionInput');
+        this.resultDisplay = document.getElementById('resultDisplay');
+        this.stepDisplay = document.getElementById('stepDisplay');
+        this.copyBtn = document.getElementById('copyResult');
+        this.stepMode = document.getElementById('stepMode');
         
+        // Calculator mode elements
+        this.modeToggle = document.getElementById('modeToggle');
+        this.basicButtons = document.getElementById('basicButtons');
+        this.scientificButtons = document.getElementById('scientificButtons');
+        
+        // History elements
+        this.historyList = document.getElementById('historyList');
+        this.clearHistoryBtn = document.getElementById('clearHistory');
+        
+        // Theme elements
+        this.themeSelector = document.getElementById('themeSelector');
+        
+        // Tab elements
+        this.tabBtns = document.querySelectorAll('.tab-btn');
+        this.tabContents = document.querySelectorAll('.tab-content');
+        
+        // State management
+        this.isScientificMode = false;
+        this.memory = 0;
+        this.history = JSON.parse(localStorage.getItem('calculatorHistory')) || [];
+        this.currentTheme = localStorage.getItem('calculatorTheme') || 'light';
+        
+        // Initialize
         this.init();
     }
     
     init() {
         this.setupEventListeners();
         this.loadTheme();
-        this.updateDisplay();
+        this.loadHistory();
+        this.setupConverters();
+        this.setupKeyboardSupport();
     }
     
     setupEventListeners() {
-        // Theme toggle
-        this.themeToggle.addEventListener('click', () => this.toggleTheme());
+        // Calculator buttons
+        this.basicButtons.addEventListener('click', (e) => this.handleButtonClick(e));
+        this.scientificButtons.addEventListener('click', (e) => this.handleButtonClick(e));
         
-        // Button clicks
-        document.querySelectorAll('.btn').forEach(button => {
-            button.addEventListener('click', (e) => this.handleButtonClick(e));
+        // Mode toggle
+        this.modeToggle.addEventListener('click', () => this.toggleMode());
+        
+        // Copy result
+        this.copyBtn.addEventListener('click', () => this.copyResult());
+        
+        // Expression input
+        this.expressionInput.addEventListener('input', () => this.handleExpressionInput());
+        this.expressionInput.addEventListener('keydown', (e) => this.handleKeydown(e));
+        
+        // Step mode toggle
+        this.stepMode.addEventListener('change', () => this.updateStepDisplay());
+        
+        // Theme selector
+        this.themeSelector.addEventListener('change', (e) => this.changeTheme(e.target.value));
+        
+        // History
+        this.clearHistoryBtn.addEventListener('click', () => this.clearHistory());
+        this.historyList.addEventListener('click', (e) => this.handleHistoryClick(e));
+        
+        // Tab navigation
+        this.tabBtns.forEach(btn => {
+            btn.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
         });
-        
-        // Keyboard support
-        document.addEventListener('keydown', (e) => this.handleKeyPress(e));
     }
     
     handleButtonClick(e) {
-        const button = e.target;
+        const btn = e.target.closest('.btn');
+        if (!btn) return;
         
-        // Add haptic feedback for mobile devices
+        // Add press animation
+        this.addPressAnimation(btn);
+        
+        // Haptic feedback for mobile
         if (navigator.vibrate) {
-            navigator.vibrate(10);
+            navigator.vibrate(50);
         }
         
-        // Add visual feedback
-        button.classList.add('pressed');
-        setTimeout(() => {
-            button.classList.remove('pressed');
-        }, 150);
+        const action = btn.dataset.action;
+        const value = btn.dataset.value;
         
-        if (button.dataset.number) {
-            this.inputNumber(button.dataset.number);
-        } else if (button.dataset.action) {
-            this.handleAction(button.dataset.action);
+        if (action) {
+            this.handleAction(action);
+        } else if (value) {
+            this.insertValue(value);
         }
-    }
-    
-    handleKeyPress(e) {
-        e.preventDefault();
-        
-        if (e.key >= '0' && e.key <= '9') {
-            this.inputNumber(e.key);
-        } else if (e.key === '.') {
-            this.handleAction('decimal');
-        } else if (e.key === '+') {
-            this.handleAction('add');
-        } else if (e.key === '-') {
-            this.handleAction('subtract');
-        } else if (e.key === '*') {
-            this.handleAction('multiply');
-        } else if (e.key === '/') {
-            this.handleAction('divide');
-        } else if (e.key === 'Enter' || e.key === '=') {
-            this.handleAction('equals');
-        } else if (e.key === 'Escape' || e.key === 'c' || e.key === 'C') {
-            this.handleAction('clear');
-        } else if (e.key === 'Backspace') {
-            this.handleAction('delete');
-        }
-    }
-    
-    inputNumber(num) {
-        if (this.waitingForOperand) {
-            this.currentInput = num;
-            this.waitingForOperand = false;
-        } else {
-            this.currentInput = this.currentInput === '0' ? num : this.currentInput + num;
-        }
-        
-        // Clear active operator when user starts typing new number
-        if (this.operator && !this.waitingForOperand) {
-            this.clearActiveOperator();
-        }
-        
-        this.updateDisplay();
-        this.updateOperationDisplay();
-        this.animateDisplay();
     }
     
     handleAction(action) {
@@ -103,269 +104,548 @@ class Calculator {
             case 'delete':
                 this.delete();
                 break;
-            case 'decimal':
-                this.inputDecimal();
-                break;
-            case 'add':
-            case 'subtract':
-            case 'multiply':
-            case 'divide':
-                this.inputOperator(action);
-                break;
             case 'equals':
                 this.calculate();
                 break;
+            case 'mc':
+                this.memory = 0;
+                break;
+            case 'mr':
+                this.insertValue(this.memory.toString());
+                break;
+            case 'mplus':
+                try {
+                    const result = this.evaluateExpression(this.expressionInput.value);
+                    this.memory += parseFloat(result) || 0;
+                } catch (e) {
+                    // Ignore errors for memory operations
+                }
+                break;
         }
+    }
+    
+    insertValue(value) {
+        const input = this.expressionInput;
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        const currentValue = input.value;
+        
+        // Handle special values
+        if (value === 'pi') value = 'pi';
+        if (value === 'e') value = 'e';
+        if (value === '^2') {
+            value = '^2';
+        }
+        
+        // Insert value at cursor position
+        const newValue = currentValue.slice(0, start) + value + currentValue.slice(end);
+        input.value = newValue;
+        
+        // Update cursor position
+        const newPosition = start + value.length;
+        input.setSelectionRange(newPosition, newPosition);
+        
+        // Update display
+        this.handleExpressionInput();
+        input.focus();
     }
     
     clear() {
-        this.currentInput = '0';
-        this.previousInput = '';
-        this.operator = null;
-        this.waitingForOperand = false;
-        this.clearActiveOperator();
-        this.updateDisplay();
-        this.updateOperationDisplay();
-        this.animateDisplay();
+        this.expressionInput.value = '';
+        this.resultDisplay.textContent = '0';
+        this.stepDisplay.textContent = '';
     }
     
     delete() {
-        if (this.currentInput.length > 1) {
-            this.currentInput = this.currentInput.slice(0, -1);
-        } else {
-            this.currentInput = '0';
+        const input = this.expressionInput;
+        const start = input.selectionStart;
+        const end = input.selectionEnd;
+        
+        if (start !== end) {
+            // Delete selection
+            input.value = input.value.slice(0, start) + input.value.slice(end);
+            input.setSelectionRange(start, start);
+        } else if (start > 0) {
+            // Delete character before cursor
+            input.value = input.value.slice(0, start - 1) + input.value.slice(start);
+            input.setSelectionRange(start - 1, start - 1);
         }
-        this.updateDisplay();
-        this.updateOperationDisplay();
-        this.animateDisplay();
+        
+        this.handleExpressionInput();
+        input.focus();
     }
     
-    inputDecimal() {
-        if (this.waitingForOperand) {
-            this.currentInput = '0.';
-            this.waitingForOperand = false;
-        } else if (this.currentInput.indexOf('.') === -1) {
-            this.currentInput += '.';
+    handleExpressionInput() {
+        const expression = this.expressionInput.value;
+        
+        if (!expression.trim()) {
+            this.resultDisplay.textContent = '0';
+            this.stepDisplay.textContent = '';
+            return;
         }
         
-        // Clear active operator when user starts typing
-        if (this.operator && !this.waitingForOperand) {
-            this.clearActiveOperator();
+        try {
+            const result = this.evaluateExpression(expression);
+            this.resultDisplay.textContent = this.formatResult(result);
+            
+            if (this.stepMode.checked) {
+                this.updateStepDisplay();
+            }
+        } catch (error) {
+            this.resultDisplay.textContent = 'Error';
+            this.stepDisplay.textContent = error.message;
         }
-        
-        this.updateDisplay();
-        this.updateOperationDisplay();
-        this.animateDisplay();
     }
     
-    inputOperator(nextOperator) {
-        const inputValue = parseFloat(this.currentInput);
+    evaluateExpression(expression) {
+        // Preprocess expression for math.js
+        let processedExpression = expression
+            .replace(/×/g, '*')
+            .replace(/÷/g, '/')
+            .replace(/−/g, '-')
+            .replace(/\^2/g, '^2')
+            .replace(/sqrt\(/g, 'sqrt(')
+            .replace(/ln\(/g, 'log(')
+            .replace(/log\(/g, 'log10(');
         
-        if (this.previousInput === '') {
-            this.previousInput = inputValue;
-        } else if (this.operator) {
-            const currentValue = this.previousInput || 0;
-            const newValue = this.performCalculation(currentValue, inputValue, this.operator);
-            
-            if (newValue === null) return;
-            
-            this.currentInput = String(newValue);
-            this.previousInput = newValue;
-            this.updateDisplay();
+        // Use math.js for evaluation
+        return math.evaluate(processedExpression);
+    }
+    
+    formatResult(result) {
+        if (typeof result === 'number') {
+            if (Math.abs(result) > 1e10 || (Math.abs(result) < 1e-6 && result !== 0)) {
+                return result.toExponential(6);
+            }
+            return parseFloat(result.toFixed(10)).toString();
         }
-        
-        this.waitingForOperand = true;
-        this.operator = nextOperator;
-        this.setActiveOperator(nextOperator);
-        this.updateOperationDisplay();
+        return result.toString();
     }
     
     calculate() {
-        const inputValue = parseFloat(this.currentInput);
+        const expression = this.expressionInput.value.trim();
+        if (!expression) return;
         
-        if (this.previousInput !== '' && this.operator) {
-            const newValue = this.performCalculation(this.previousInput, inputValue, this.operator);
+        try {
+            const result = this.evaluateExpression(expression);
+            const formattedResult = this.formatResult(result);
             
-            if (newValue === null) return;
+            // Add to history
+            this.addToHistory(expression, formattedResult);
             
-            // Show the complete calculation in operation display
-            this.showCalculationResult(this.previousInput, inputValue, this.operator, newValue);
+            // Update display
+            this.resultDisplay.textContent = formattedResult;
             
-            this.currentInput = String(newValue);
-            this.previousInput = '';
-            this.operator = null;
-            this.waitingForOperand = true;
-            this.clearActiveOperator();
-            this.updateDisplay();
-            this.animateDisplay();
+            // Show step-by-step if enabled
+            if (this.stepMode.checked) {
+                this.showStepByStep(expression, result);
+            }
+            
+            // Clear input for next calculation
+            this.expressionInput.value = '';
+            
+        } catch (error) {
+            this.resultDisplay.textContent = 'Error';
+            this.stepDisplay.textContent = error.message;
         }
     }
     
-    performCalculation(firstOperand, secondOperand, operator) {
-        let result;
+    showStepByStep(expression, result) {
+        // Simple step-by-step breakdown
+        let steps = `Input: ${expression}\n`;
         
-        switch (operator) {
-            case 'add':
-                result = firstOperand + secondOperand;
-                break;
-            case 'subtract':
-                result = firstOperand - secondOperand;
-                break;
-            case 'multiply':
-                result = firstOperand * secondOperand;
-                break;
-            case 'divide':
-                if (secondOperand === 0) {
-                    this.showError('Cannot divide by zero');
-                    return null;
+        // Try to break down the expression
+        try {
+            // For simple expressions, show intermediate steps
+            if (expression.includes('(') && expression.includes(')')) {
+                const innerMatch = expression.match(/\(([^()]+)\)/);
+                if (innerMatch) {
+                    const innerExpr = innerMatch[1];
+                    const innerResult = this.evaluateExpression(innerExpr);
+                    steps += `Step 1: Evaluate (${innerExpr}) = ${this.formatResult(innerResult)}\n`;
+                    
+                    const remainingExpr = expression.replace(innerMatch[0], innerResult);
+                    steps += `Step 2: ${remainingExpr}\n`;
                 }
-                result = firstOperand / secondOperand;
-                break;
-            default:
-                return null;
+            }
+            
+            steps += `Result: ${this.formatResult(result)}`;
+        } catch (e) {
+            steps += `Result: ${this.formatResult(result)}`;
         }
         
-        // Round to avoid floating point precision issues
-        return Math.round((result + Number.EPSILON) * 100000000) / 100000000;
+        this.stepDisplay.textContent = steps;
     }
     
-    updateDisplay() {
-        const value = this.currentInput;
-        
-        // Format large numbers
-        if (value.length > 12) {
-            const num = parseFloat(value);
-            if (num > 999999999999) {
-                this.display.textContent = num.toExponential(6);
-            } else {
-                this.display.textContent = value.substring(0, 12);
+    updateStepDisplay() {
+        if (this.stepMode.checked && this.expressionInput.value.trim()) {
+            try {
+                const expression = this.expressionInput.value;
+                const result = this.evaluateExpression(expression);
+                this.showStepByStep(expression, result);
+            } catch (e) {
+                this.stepDisplay.textContent = 'Invalid expression';
             }
         } else {
-            this.display.textContent = value;
+            this.stepDisplay.textContent = '';
         }
     }
     
-    animateDisplay() {
-        this.display.classList.add('animate');
-        setTimeout(() => {
-            this.display.classList.remove('animate');
-        }, 200);
-    }
-    
-    showError(message) {
-        this.display.textContent = 'Error';
-        this.display.classList.add('error');
-        this.operationDisplay.textContent = message;
-        
-        setTimeout(() => {
-            this.display.classList.remove('error');
-            this.clear();
-        }, 1500);
-    }
-    
-    updateOperationDisplay() {
-        if (this.previousInput !== '' && this.operator) {
-            const operatorSymbol = this.getOperatorSymbol(this.operator);
-            this.operationDisplay.textContent = `${this.previousInput} ${operatorSymbol}`;
-        } else {
-            this.operationDisplay.textContent = '';
-        }
-    }
-    
-    getOperatorSymbol(operator) {
-        const symbols = {
-            'add': '+',
-            'subtract': '−',
-            'multiply': '×',
-            'divide': '÷'
+    addToHistory(expression, result) {
+        const historyItem = {
+            id: Date.now(),
+            expression,
+            result,
+            timestamp: new Date().toLocaleString()
         };
-        return symbols[operator] || '';
-    }
-    
-    setActiveOperator(operator) {
-        this.clearActiveOperator();
-        const operatorButton = document.querySelector(`[data-action="${operator}"]`);
-        if (operatorButton) {
-            operatorButton.classList.add('active');
-            this.activeOperatorButton = operatorButton;
-        }
-    }
-    
-    clearActiveOperator() {
-        if (this.activeOperatorButton) {
-            this.activeOperatorButton.classList.remove('active');
-            this.activeOperatorButton = null;
-        }
-    }
-    
-    showCalculationResult(firstOperand, secondOperand, operator, result) {
-        const operatorSymbol = this.getOperatorSymbol(operator);
-        this.operationDisplay.textContent = `${firstOperand} ${operatorSymbol} ${secondOperand} =`;
         
-        // Clear the operation display after 3 seconds
-        setTimeout(() => {
-            if (this.operationDisplay.textContent.includes('=')) {
-                this.operationDisplay.textContent = '';
+        this.history.unshift(historyItem);
+        
+        // Keep only last 50 items
+        if (this.history.length > 50) {
+            this.history = this.history.slice(0, 50);
+        }
+        
+        this.saveHistory();
+        this.renderHistory();
+    }
+    
+    saveHistory() {
+        localStorage.setItem('calculatorHistory', JSON.stringify(this.history));
+    }
+    
+    loadHistory() {
+        this.renderHistory();
+    }
+    
+    renderHistory() {
+        if (this.history.length === 0) {
+            this.historyList.innerHTML = '<div class="history-empty">No calculations yet</div>';
+            return;
+        }
+        
+        this.historyList.innerHTML = this.history.map(item => `
+            <div class="history-item" data-id="${item.id}">
+                <div class="history-expression">${item.expression}</div>
+                <div class="history-result">${item.result}</div>
+                <button class="history-delete" data-id="${item.id}">×</button>
+            </div>
+        `).join('');
+    }
+    
+    handleHistoryClick(e) {
+        if (e.target.classList.contains('history-delete')) {
+            const id = parseInt(e.target.dataset.id);
+            this.deleteHistoryItem(id);
+        } else if (e.target.closest('.history-item')) {
+            const item = e.target.closest('.history-item');
+            const id = parseInt(item.dataset.id);
+            const historyItem = this.history.find(h => h.id === id);
+            if (historyItem) {
+                this.expressionInput.value = historyItem.expression;
+                this.handleExpressionInput();
+                this.expressionInput.focus();
             }
-        }, 3000);
+        }
     }
     
-    toggleTheme() {
-        this.isDarkTheme = !this.isDarkTheme;
-        document.body.classList.toggle('dark', this.isDarkTheme);
+    deleteHistoryItem(id) {
+        this.history = this.history.filter(item => item.id !== id);
+        this.saveHistory();
+        this.renderHistory();
+    }
+    
+    clearHistory() {
+        this.history = [];
+        this.saveHistory();
+        this.renderHistory();
+    }
+    
+    copyResult() {
+        const result = this.resultDisplay.textContent;
+        if (result && result !== '0' && result !== 'Error') {
+            navigator.clipboard.writeText(result).then(() => {
+                // Visual feedback
+                const originalText = this.copyBtn.textContent;
+                this.copyBtn.textContent = '✓';
+                setTimeout(() => {
+                    this.copyBtn.textContent = originalText;
+                }, 1000);
+            }).catch(() => {
+                // Fallback for older browsers
+                const textArea = document.createElement('textarea');
+                textArea.value = result;
+                document.body.appendChild(textArea);
+                textArea.select();
+                document.execCommand('copy');
+                document.body.removeChild(textArea);
+            });
+        }
+    }
+    
+    toggleMode() {
+        this.isScientificMode = !this.isScientificMode;
         
-        // Update theme icon
-        const themeIcon = this.themeToggle.querySelector('.theme-icon');
-        themeIcon.textContent = this.isDarkTheme ? '☀️' : '🌙';
-        
-        // Save theme preference
-        localStorage.setItem('calculatorTheme', this.isDarkTheme ? 'dark' : 'light');
-        
-        // Add animation to theme button
-        this.themeToggle.style.transform = 'rotate(360deg)';
-        setTimeout(() => {
-            this.themeToggle.style.transform = '';
-        }, 300);
+        if (this.isScientificMode) {
+            this.basicButtons.classList.add('hidden');
+            this.scientificButtons.classList.remove('hidden');
+            this.modeToggle.textContent = 'Basic';
+        } else {
+            this.scientificButtons.classList.add('hidden');
+            this.basicButtons.classList.remove('hidden');
+            this.modeToggle.textContent = 'Scientific';
+        }
+    }
+    
+    changeTheme(theme) {
+        this.currentTheme = theme;
+        document.documentElement.setAttribute('data-theme', theme);
+        localStorage.setItem('calculatorTheme', theme);
     }
     
     loadTheme() {
-        const savedTheme = localStorage.getItem('calculatorTheme');
-        if (savedTheme === 'dark') {
-            this.isDarkTheme = true;
-            document.body.classList.add('dark');
-            const themeIcon = this.themeToggle.querySelector('.theme-icon');
-            themeIcon.textContent = '☀️';
-        }
+        this.themeSelector.value = this.currentTheme;
+        this.changeTheme(this.currentTheme);
     }
-}
-
-// Initialize calculator when DOM is loaded
-document.addEventListener('DOMContentLoaded', () => {
-    new Calculator();
-});
-
-// Add some visual feedback for touch devices
-if ('ontouchstart' in window) {
-    document.querySelectorAll('.btn').forEach(button => {
-        button.addEventListener('touchstart', function() {
-            this.style.transform = 'scale(0.95)';
+    
+    switchTab(tabName) {
+        // Update tab buttons
+        this.tabBtns.forEach(btn => {
+            btn.classList.toggle('active', btn.dataset.tab === tabName);
         });
         
-        button.addEventListener('touchend', function() {
-            setTimeout(() => {
-                this.style.transform = '';
-            }, 100);
+        // Update tab contents
+        this.tabContents.forEach(content => {
+            content.classList.toggle('active', content.id === tabName);
         });
-    });
+    }
+    
+    addPressAnimation(btn) {
+        btn.classList.add('pressed');
+        setTimeout(() => {
+            btn.classList.remove('pressed');
+        }, 150);
+    }
+    
+    setupKeyboardSupport() {
+        document.addEventListener('keydown', (e) => {
+            // Only handle keyboard events when calculator tab is active
+            if (!document.getElementById('calculator').classList.contains('active')) return;
+            
+            // Prevent default for calculator keys
+            if ('0123456789+-*/().='.includes(e.key) || e.key === 'Enter' || e.key === 'Escape' || e.key === 'Backspace') {
+                if (e.key === 'Enter') {
+                    e.preventDefault();
+                    this.calculate();
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.clear();
+                }
+                // Other keys are handled by the input field naturally
+            }
+        });
+    }
+    
+    handleKeydown(e) {
+        if (e.key === 'Enter') {
+            e.preventDefault();
+            this.calculate();
+        }
+    }
+    
+    setupConverters() {
+        this.setupUnitConverter();
+        this.setupCurrencyConverter();
+        this.setupAgeCalculator();
+    }
+    
+    setupUnitConverter() {
+        const categorySelect = document.getElementById('unitCategory');
+        const fromUnit = document.getElementById('fromUnit');
+        const toUnit = document.getElementById('toUnit');
+        const fromValue = document.getElementById('fromValue');
+        const toValue = document.getElementById('toValue');
+        
+        const units = {
+            length: {
+                'm': { name: 'Meters', factor: 1 },
+                'cm': { name: 'Centimeters', factor: 100 },
+                'mm': { name: 'Millimeters', factor: 1000 },
+                'km': { name: 'Kilometers', factor: 0.001 },
+                'in': { name: 'Inches', factor: 39.3701 },
+                'ft': { name: 'Feet', factor: 3.28084 },
+                'yd': { name: 'Yards', factor: 1.09361 },
+                'mi': { name: 'Miles', factor: 0.000621371 }
+            },
+            weight: {
+                'kg': { name: 'Kilograms', factor: 1 },
+                'g': { name: 'Grams', factor: 1000 },
+                'lb': { name: 'Pounds', factor: 2.20462 },
+                'oz': { name: 'Ounces', factor: 35.274 },
+                'ton': { name: 'Metric Tons', factor: 0.001 }
+            },
+            temperature: {
+                'c': { name: 'Celsius', factor: 1 },
+                'f': { name: 'Fahrenheit', factor: 1 },
+                'k': { name: 'Kelvin', factor: 1 }
+            }
+        };
+        
+        function updateUnitOptions() {
+            const category = categorySelect.value;
+            const unitList = units[category];
+            
+            fromUnit.innerHTML = '';
+            toUnit.innerHTML = '';
+            
+            Object.keys(unitList).forEach(key => {
+                const option1 = new Option(unitList[key].name, key);
+                const option2 = new Option(unitList[key].name, key);
+                fromUnit.appendChild(option1);
+                toUnit.appendChild(option2);
+            });
+            
+            // Set default selections
+            if (category === 'length') {
+                fromUnit.value = 'm';
+                toUnit.value = 'cm';
+            } else if (category === 'weight') {
+                fromUnit.value = 'kg';
+                toUnit.value = 'lb';
+            } else if (category === 'temperature') {
+                fromUnit.value = 'c';
+                toUnit.value = 'f';
+            }
+            
+            convertUnits();
+        }
+        
+        function convertUnits() {
+            const value = parseFloat(fromValue.value);
+            if (isNaN(value)) {
+                toValue.value = '';
+                return;
+            }
+            
+            const category = categorySelect.value;
+            const from = fromUnit.value;
+            const to = toUnit.value;
+            
+            let result;
+            
+            if (category === 'temperature') {
+                // Special handling for temperature
+                if (from === 'c' && to === 'f') {
+                    result = (value * 9/5) + 32;
+                } else if (from === 'f' && to === 'c') {
+                    result = (value - 32) * 5/9;
+                } else if (from === 'c' && to === 'k') {
+                    result = value + 273.15;
+                } else if (from === 'k' && to === 'c') {
+                    result = value - 273.15;
+                } else if (from === 'f' && to === 'k') {
+                    result = (value - 32) * 5/9 + 273.15;
+                } else if (from === 'k' && to === 'f') {
+                    result = (value - 273.15) * 9/5 + 32;
+                } else {
+                    result = value; // Same unit
+                }
+            } else {
+                // Standard conversion using factors
+                const fromFactor = units[category][from].factor;
+                const toFactor = units[category][to].factor;
+                result = value * (toFactor / fromFactor);
+            }
+            
+            toValue.value = result.toFixed(6).replace(/\.?0+$/, '');
+        }
+        
+        categorySelect.addEventListener('change', updateUnitOptions);
+        fromUnit.addEventListener('change', convertUnits);
+        toUnit.addEventListener('change', convertUnits);
+        fromValue.addEventListener('input', convertUnits);
+        
+        // Initialize
+        updateUnitOptions();
+    }
+    
+    setupCurrencyConverter() {
+        const fromValue = document.getElementById('currencyFromValue');
+        const toValue = document.getElementById('currencyToValue');
+        const fromCurrency = document.getElementById('currencyFrom');
+        const toCurrency = document.getElementById('currencyTo');
+        
+        // Mock exchange rates (in real app, you'd fetch from API)
+        const exchangeRates = {
+            'USD': { 'VND': 24000, 'EUR': 0.85 },
+            'VND': { 'USD': 1/24000, 'EUR': 0.85/24000 },
+            'EUR': { 'USD': 1/0.85, 'VND': 24000/0.85 }
+        };
+        
+        function convertCurrency() {
+            const value = parseFloat(fromValue.value);
+            if (isNaN(value)) {
+                toValue.value = '';
+                return;
+            }
+            
+            const from = fromCurrency.value;
+            const to = toCurrency.value;
+            
+            if (from === to) {
+                toValue.value = value;
+                return;
+            }
+            
+            const rate = exchangeRates[from][to];
+            const result = value * rate;
+            
+            toValue.value = result.toFixed(2);
+        }
+        
+        fromValue.addEventListener('input', convertCurrency);
+        fromCurrency.addEventListener('change', convertCurrency);
+        toCurrency.addEventListener('change', convertCurrency);
+    }
+    
+    setupAgeCalculator() {
+        const birthDateInput = document.getElementById('birthDate');
+        const calculateBtn = document.getElementById('calculateAge');
+        const resultDiv = document.getElementById('ageResult');
+        
+        function calculateAge() {
+            const birthDate = new Date(birthDateInput.value);
+            if (!birthDateInput.value) {
+                resultDiv.textContent = 'Please select a birth date';
+                return;
+            }
+            
+            const today = new Date();
+            const ageInMs = today - birthDate;
+            
+            if (ageInMs < 0) {
+                resultDiv.textContent = 'Birth date cannot be in the future';
+                return;
+            }
+            
+            const ageInDays = Math.floor(ageInMs / (1000 * 60 * 60 * 24));
+            const years = Math.floor(ageInDays / 365.25);
+            const months = Math.floor((ageInDays % 365.25) / 30.44);
+            const days = Math.floor((ageInDays % 365.25) % 30.44);
+            
+            resultDiv.innerHTML = `
+                <div><strong>Age:</strong> ${years} years, ${months} months, ${days} days</div>
+                <div><strong>Total Days:</strong> ${ageInDays.toLocaleString()} days</div>
+                <div><strong>Total Hours:</strong> ${(ageInDays * 24).toLocaleString()} hours</div>
+            `;
+        }
+        
+        calculateBtn.addEventListener('click', calculateAge);
+        birthDateInput.addEventListener('change', calculateAge);
+    }
 }
 
-// Prevent zoom on double tap for mobile
-document.addEventListener('touchend', function(event) {
-    const now = (new Date()).getTime();
-    if (now - lastTouchEnd <= 300) {
-        event.preventDefault();
-    }
-    lastTouchEnd = now;
-}, false);
-
-let lastTouchEnd = 0;
+// Initialize the calculator when DOM is loaded
+document.addEventListener('DOMContentLoaded', () => {
+    new AdvancedCalculator();
+});
