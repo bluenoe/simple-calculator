@@ -130,19 +130,38 @@ class AdvancedCalculator {
         const end = input.selectionEnd;
         const currentValue = input.value;
         
-        // Handle special values
-        if (value === 'pi') value = 'pi';
-        if (value === 'e') value = 'e';
-        if (value === '^2') {
-            value = '^2';
+        // Handle special values and functions
+        let processedValue = value;
+        if (value === 'pi') processedValue = 'π';
+        if (value === 'e') processedValue = 'e';
+        if (value === '^2') processedValue = '^2';
+        
+        // Add multiplication operator before constants if needed
+        const beforeCursor = currentValue.slice(0, start);
+        const afterCursor = currentValue.slice(end);
+        
+        // Check if we need to add multiplication before constants
+        if ((value === 'pi' || value === 'e') && beforeCursor.length > 0) {
+            const lastChar = beforeCursor[beforeCursor.length - 1];
+            if (/[0-9)]/.test(lastChar)) {
+                processedValue = '*' + processedValue;
+            }
+        }
+        
+        // Check if we need to add multiplication after constants
+        if ((value === 'pi' || value === 'e') && afterCursor.length > 0) {
+            const nextChar = afterCursor[0];
+            if (/[0-9(]/.test(nextChar)) {
+                processedValue = processedValue + '*';
+            }
         }
         
         // Insert value at cursor position
-        const newValue = currentValue.slice(0, start) + value + currentValue.slice(end);
+        const newValue = beforeCursor + processedValue + afterCursor;
         input.value = newValue;
         
         // Update cursor position
-        const newPosition = start + value.length;
+        const newPosition = start + processedValue.length;
         input.setSelectionRange(newPosition, newPosition);
         
         // Update display
@@ -206,20 +225,81 @@ class AdvancedCalculator {
             .replace(/\^2/g, '^2')
             .replace(/sqrt\(/g, 'sqrt(')
             .replace(/ln\(/g, 'log(')
-            .replace(/log\(/g, 'log10(');
+            .replace(/log\(/g, 'log10(')
+            .replace(/π/g, 'pi')
+            .replace(/pi/g, 'pi')
+            .replace(/e(?![a-zA-Z])/g, 'e'); // Match 'e' only when not part of a word
         
-        // Use math.js for evaluation
-        return math.evaluate(processedExpression);
+        // Validate expression before evaluation
+        if (!processedExpression.trim()) {
+            throw new Error('Empty expression');
+        }
+        
+        // Check for undefined functions or variables
+        const invalidPatterns = [
+            /[a-zA-Z]+\s*\(/g, // Functions not properly closed
+            /\)\s*\(/g, // Missing operator between parentheses
+            /\d+[a-zA-Z]/g, // Numbers directly followed by letters
+            /[+\-*/^]\s*[+\-*/^]/g // Consecutive operators
+        ];
+        
+        for (const pattern of invalidPatterns) {
+            if (pattern.test(processedExpression.replace(/sqrt|log10|log|sin|cos|tan|pi|e/g, ''))) {
+                throw new Error('Invalid expression syntax');
+            }
+        }
+        
+        try {
+            // Use math.js for evaluation
+            const result = math.evaluate(processedExpression);
+            
+            // Check for mathematical errors
+            if (result === undefined || result === null) {
+                throw new Error('Undefined result');
+            }
+            
+            if (typeof result === 'number' && (isNaN(result) || !isFinite(result))) {
+                throw new Error('Mathematical error: Result is not a finite number');
+            }
+            
+            return result;
+        } catch (error) {
+            if (error.message.includes('Undefined symbol')) {
+                throw new Error('Unknown function or variable');
+            } else if (error.message.includes('Unexpected')) {
+                throw new Error('Syntax error in expression');
+            } else {
+                throw new Error(error.message || 'Mathematical error');
+            }
+        }
     }
     
     formatResult(result) {
         if (typeof result === 'number') {
+            // Handle special cases
+            if (isNaN(result)) {
+                return 'NaN';
+            }
+            if (!isFinite(result)) {
+                return result > 0 ? 'Infinity' : '-Infinity';
+            }
+            
+            // Format very large or very small numbers
             if (Math.abs(result) > 1e10 || (Math.abs(result) < 1e-6 && result !== 0)) {
                 return result.toExponential(6);
             }
-            return parseFloat(result.toFixed(10)).toString();
+            
+            // Round to avoid floating point precision issues
+            const rounded = Math.round((result + Number.EPSILON) * 1e10) / 1e10;
+            return rounded.toString();
         }
-        return result.toString();
+        
+        // Handle complex numbers or other math.js types
+        if (result && typeof result === 'object' && result.toString) {
+            return result.toString();
+        }
+        
+        return String(result);
     }
     
     calculate() {
@@ -251,30 +331,71 @@ class AdvancedCalculator {
     }
     
     showStepByStep(expression, result) {
-        // Simple step-by-step breakdown
-        let steps = `Input: ${expression}\n`;
+        let steps = [];
+        steps.push(`📝 Input: ${expression}`);
+        steps.push(''); // Empty line for spacing
         
-        // Try to break down the expression
         try {
-            // For simple expressions, show intermediate steps
+            // Handle parentheses first
             if (expression.includes('(') && expression.includes(')')) {
-                const innerMatch = expression.match(/\(([^()]+)\)/);
-                if (innerMatch) {
-                    const innerExpr = innerMatch[1];
-                    const innerResult = this.evaluateExpression(innerExpr);
-                    steps += `Step 1: Evaluate (${innerExpr}) = ${this.formatResult(innerResult)}\n`;
-                    
-                    const remainingExpr = expression.replace(innerMatch[0], innerResult);
-                    steps += `Step 2: ${remainingExpr}\n`;
+                let currentExpr = expression;
+                let stepNum = 1;
+                
+                // Process nested parentheses from innermost to outermost
+                while (currentExpr.includes('(') && currentExpr.includes(')')) {
+                    const innerMatch = currentExpr.match(/\(([^()]+)\)/);
+                    if (innerMatch) {
+                        const innerExpr = innerMatch[1];
+                        const innerResult = this.evaluateExpression(innerExpr);
+                        const formattedInnerResult = this.formatResult(innerResult);
+                        
+                        steps.push(`🔹 Step ${stepNum}: Evaluate (${innerExpr})`);
+                        steps.push(`   = ${formattedInnerResult}`);
+                        steps.push('');
+                        
+                        currentExpr = currentExpr.replace(innerMatch[0], formattedInnerResult);
+                        stepNum++;
+                        
+                        if (currentExpr !== expression) {
+                            steps.push(`🔹 Step ${stepNum}: Substitute result`);
+                            steps.push(`   = ${currentExpr}`);
+                            steps.push('');
+                            stepNum++;
+                        }
+                    } else {
+                        break;
+                    }
+                }
+                
+                // Final calculation if there are remaining operations
+                if (currentExpr.includes('+') || currentExpr.includes('-') || 
+                    currentExpr.includes('*') || currentExpr.includes('/')) {
+                    steps.push(`🔹 Step ${stepNum}: Final calculation`);
+                    steps.push(`   = ${this.formatResult(result)}`);
+                }
+            } else {
+                // Simple expression without parentheses
+                const operators = ['+', '-', '*', '/', '^'];
+                const hasOperator = operators.some(op => expression.includes(op));
+                
+                if (hasOperator) {
+                    steps.push(`🔹 Step 1: Calculate ${expression}`);
+                    steps.push(`   = ${this.formatResult(result)}`);
+                } else {
+                    steps.push(`🔹 Direct evaluation`);
+                    steps.push(`   = ${this.formatResult(result)}`);
                 }
             }
             
-            steps += `Result: ${this.formatResult(result)}`;
+            steps.push('');
+            steps.push(`✅ Final Result: ${this.formatResult(result)}`);
+            
         } catch (e) {
-            steps += `Result: ${this.formatResult(result)}`;
+            steps.push(`❌ Error in step calculation`);
+            steps.push(`✅ Final Result: ${this.formatResult(result)}`);
         }
         
-        this.stepDisplay.textContent = steps;
+        this.stepDisplay.textContent = steps.join('\n');
     }
     
     updateStepDisplay() {

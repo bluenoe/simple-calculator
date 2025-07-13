@@ -302,6 +302,14 @@ body {
   min-height: 50px;
   border: 1px solid var(--border-color);
   white-space: pre-line;
+  line-height: 1.6;
+  font-family: 'Courier New', monospace;
+  overflow-y: auto;
+  max-height: 200px;
+}
+
+.step-display:empty {
+  display: none;
 }
 
 /* Calculator Controls */
